@@ -1,0 +1,23 @@
+.radioSelected{
+    border-radius: 25px;
+    background: rgb(207, 226, 243);
+    width: 240px;
+    height: 30px; 
+}
+
+li[data-index]{
+    padding: 2px;
+    margin: 2px;
+}
+
+li[data-index] input[type=color]{
+    height: 20px;
+    width: 50px;
+}
+
+li[data-index] input[type=text]{
+    height: 20px;
+    width: 100px;
+    margin:0;
+    padding:0;
+}
