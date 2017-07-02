@@ -1,4 +1,4 @@
-var idsPool = require('./idsPool');
+var calendarEvents = require('./calendarEvents');
 var eventsModel = require('./eventsModel');
 var datesModel = require('./datesModel');
 
@@ -23,22 +23,19 @@ $(function () {
         },
         beforeShowDay: function (date) {
             var eventId = datesModel.getEventIdForDate(getDate(date));
-//                        console.log('date ' + date + ', id ' + eventId);
             if (!!eventId) {
                 return [true, "event-color-" + eventId, eventsModel.getName(eventId)];
             }
             return [true, "ui-state-default", ""];
         },
         afterShow: function () {
-            var ids = idsPool.getIds();
-            for (var i = 0; i < ids.length; i++) {
-                var id = ids[i];
-                $('.event-color-' + id).each(function () {
+            calendarEvents.getEvents().forEach(function (event) {
+                $('.event-color-' + event.id).each(function () {
                     var t = $(this);
-                    t.css('background', eventsModel.getColor(id));
-                    t.find('> a').css('background', eventsModel.getColor(id));
+                    t.css('background', event.color);
+                    t.find('> a').css('background', event.color);
                 });
-            }
+            });
             $('.ui-state-active').attr('class', '');
         }
     });

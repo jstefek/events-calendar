@@ -22,4 +22,4 @@ CalendarEvent.prototype.setId = function (i) {
     this.id = i;
 };
 
-module.exports=CalendarEvent;
+module.exports = CalendarEvent;

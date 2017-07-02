@@ -1,7 +1,6 @@
 var CalendarEvent = require('./calendarEvent');
 
-
-function removeSelected() {
+function removePreviouslySelected() {
     var els = document.getElementsByClassName('radioSelected');
     for (var el in els) {
         if (!!els[el] && !!els[el].classList) {
@@ -9,8 +8,8 @@ function removeSelected() {
         }
     }
 }
-function select(el) {
-    removeSelected();
+function markSelected(el) {
+    removePreviouslySelected();
     el.setAttribute('class', 'radioSelected');
 }
 
@@ -32,23 +31,18 @@ function initColorOptions() {
 function EventsModel() {
     this.defaultColor = '#00f';
     this.defaultName = '';
-    this.events = {};
     this.persistanceUnit = require('./persistence');
     this.datesModel = require('./datesModel');
     this.calendarRefresher = require('./calendarRefresher');
-    this.idsPool = require('./idsPool');
+    this.idGenerator = require('./idGenerator');
+    this.eventStorage = require('./eventStorage');
+    this.calendarEvents = require('./calendarEvents');
 }
 
-EventsModel.prototype.addEvent = function (id) {
-    if (!this.events[id]) {
-        this.events[id] = new CalendarEvent(id, this.defaultName, this.defaultColor);
-        this.save();
-    }
-};
-EventsModel.prototype.save = function () {
-    this.persistanceUnit.save('events', this.events);
-};
 EventsModel.prototype.addEventEditElements = function (eventId, color, name) {
+    var ce = new CalendarEvent(eventId, name, color);
+    this.calendarEvents.addEvent(ce);
+
     var newLi = document.createElement("li");
     newLi.setAttribute('data-index', eventId);
 
@@ -60,22 +54,22 @@ EventsModel.prototype.addEventEditElements = function (eventId, color, name) {
     nameInput.type = "text";
     nameInput.placeholder = 'insert event name';
     nameInput.value = name;
-    var ce = this.events[eventId];
 
     nameInput.onchange = function () {
         ce.setName(nameInput.value);
+        this.calendarEvents.updateEventWithId(ce.id, ce);
         this.calendarRefresher.refresh();
-        this.save();
     }.bind(this);
 
     var colorInput = document.createElement('input');
     colorInput.type = 'color';
     colorInput.value = color;
     colorInput.setAttribute('list', 'colorsOptions');
-    colorInput.addEventListener('input', function (e) {
+    colorInput.setAttribute('tabindex', '-1');
+    colorInput.addEventListener('input', function (event) {
         ce.setColor(event.target.value);
+        this.calendarEvents.updateEventWithId(ce.id, ce);
         this.calendarRefresher.refresh();
-        this.save();
     }.bind(this));
 
     var deleteLink = document.createElement("a");
@@ -90,40 +84,33 @@ EventsModel.prototype.addEventEditElements = function (eventId, color, name) {
         }
     }.bind(this));
 
-    var radioButton = document.createElement('input');
-    radioButton.type = 'radio';
-    radioButton.checked = 'true';
-    radioButton.name = 'selected';
-    radioButton.value = eventId;
-    radioButton.addEventListener('click', function (event) {
-        select(event.target.parentNode);
-    });
     var div = document.createElement('div');
-    select(div);
 
-    div.appendChild(radioButton);
+    // select added div
+    markSelected(div);
+    this.eventStorage.setValue(eventId);
+
     div.appendChild(nameInput);
     div.appendChild(colorInput);
     div.appendChild(deleteLink);
 
     newLi.appendChild(div);
 
+    newLi.addEventListener('click', function (event) {
+        markSelected(div);
+        this.eventStorage.setValue(eventId);
+    }.bind(this));
+
     document.querySelector("ul#eventsList").appendChild(newLi);
 };
 
 EventsModel.prototype.addNewEvent = function () {
-    var id = this.idsPool.getNextId();
-    this.addEvent(id);
-    this.addEventEditElements(id, this.defaultColor, this.defaultName);
+    this.addEventEditElements(this.idGenerator.generateID(), this.defaultColor, this.defaultName);
 };
 
 EventsModel.prototype.removeEvent = function (id) {
-    // remove from pool
-    this.idsPool.removeId(id);
     // delete from object
-    if (!!this.events[id]) {
-        delete this.events[id];
-        this.save();
+    if (this.calendarEvents.removeEvent(id)) {
         // remove elements
         var element = document.querySelector("li[data-index='" + id + "']");
         var wasSelected = (element.children[0].getAttribute('class') || '').indexOf('radioSelected') !== -1;
@@ -141,28 +128,19 @@ EventsModel.prototype.removeEvent = function (id) {
     }
 };
 EventsModel.prototype.getColor = function (id) {
-    if (this.events[id]) {
-        return this.events[id].getColor();
-    }
+    var event = this.calendarEvents.getEventWithId(id);
+    return !!event && !!event.color ? event.color : this.defaultColor;
 };
 EventsModel.prototype.getName = function (id) {
-    if (this.events[id]) {
-        return this.events[id].getName();
-    }
+    var event = this.calendarEvents.getEventWithId(id);
+    return !!event && !!event.name ? event.name : this.defaultName;
 };
 EventsModel.prototype.init = function () {
     $(function () {
-        var eventsAsJSON = this.persistanceUnit.load('events');
-        if (!!eventsAsJSON) {
-            var eventsO = JSON.parse(eventsAsJSON);
-            for (var id in eventsO) {
-                if (eventsO.hasOwnProperty(id)) {
-                    var ev = eventsO[id];
-                    this.events[id] = new CalendarEvent(id, ev.name, ev.color); // convert object to CalendarEvent
-                    var correctEvent = this.events[id];
-                    this.addEventEditElements(id, correctEvent.getColor(), correctEvent.getName());
-                }
-            }
+        var events = this.calendarEvents.getEvents();
+        for (var e in events) {
+            var event = events[e];
+            this.addEventEditElements(event.getId(), event.getColor(), event.getName());
         }
     }.bind(this));
 };

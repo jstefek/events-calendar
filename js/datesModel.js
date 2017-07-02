@@ -1,62 +1,23 @@
-//storage for dates
+var DateEvent = require('./dateEvent');
+
 function DatesModel() {
-    this.dates = {};
     this.persistanceUnit = require('./persistence');
-    this.idsPool = require('./idsPool');
+    this.dateEvents = require('./dateEvents');
+    this.eventStorage = require('./eventStorage');
 }
-DatesModel.prototype.removeAllDatesWithEventId = function (eventId) {
-    var someDeleted = false;
-    for (var d in this.dates) {
-        if (!this.dates.hasOwnProperty(d)) {
-            continue;
-        }
-        if (this.dates[d] == eventId) {
-            delete this.dates[d];
-            someDeleted = true;
-        }
-    }
-    if (someDeleted) {
-        this.save();
-    }
+DatesModel.prototype.removeAllDatesWithEventId = function (id) {
+    this.dateEvents.removeEventsWithId(id);
 };
 DatesModel.prototype.getEventIdForDate = function (date) {
-    return this.dates[date];
+    var e = this.dateEvents.getEventWithDate(date);
+    return e && e.id ? e.id : '';
 };
-DatesModel.prototype.init = function () {
-    var datesAsJSON = this.persistanceUnit.load('dates');
-    if (!!datesAsJSON) {
-        this.dates = JSON.parse(datesAsJSON);
-    }
-};
-DatesModel.prototype.save = function () {
-    this.persistanceUnit.save('dates', this.dates);
-};
-DatesModel.prototype.addOrUpdateDate = function (d) {
-    var eventId = this.dates[d];
-    var modified = false;
-    
-    if (eventId > 0) {// date is already saved
-        var nextAvailableId = this.idsPool.getNextIdAfter(eventId);
-        if (!!nextAvailableId) {
-            this.dates[d] = nextAvailableId;
-            modified = true;
-        } else {// delete date, there is no more event indexes
-            delete this.dates[d];
-            modified = true;
-        }
-    } else {// try to add a new date
-        var firstID = this.idsPool.getIds()[0];
-        if (!!firstID) {// add only when there are some events
-            this.dates[d] = firstID;
-            modified = true;
-        } else {// no events are specified, nothing to do
-        }
-    }
-    if (modified) {
-        this.save();
+DatesModel.prototype.addOrUpdateDate = function (date) {
+    var id = this.eventStorage.getValue();
+    if (!!id) {
+        this.dateEvents.addOrSwitchOrReplaceEvent(new DateEvent(id, date));
     }
 };
 
 var dm = new DatesModel();
-dm.init();
 module.exports = dm;
