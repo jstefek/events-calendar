@@ -16,6 +16,7 @@ function getDate(d) {
 }
 
 $(function () {
+    // initialize date picker
     $("#datepicker").datepicker({
         inline: true,
         onSelect: function (date) {
@@ -23,14 +24,16 @@ $(function () {
         },
         beforeShowDay: function (date) {
             var eventId = datesModel.getEventIdForDate(getDate(date));
-            if (!!eventId) {
+            if (!!eventId) {// has the date some event on it?
+                // set an marker class on the date
                 return [true, "event-color-" + eventId, eventsModel.getName(eventId)];
             }
             return [true, "ui-state-default", ""];
         },
         afterShow: function () {
-            calendarEvents.getEvents().forEach(function (event) {
-                $('.event-color-' + event.id).each(function () {
+            calendarEvents.getEvents().forEach(function (event) {// for all events
+                $('.event-color-' + event.id).each(function () {// for all marked dates for this event
+                    // mark the date with the right event color
                     var t = $(this);
                     t.css('background', event.color);
                     t.find('> a').css('background', event.color);
@@ -40,6 +43,7 @@ $(function () {
         }
     });
 
+    // add ability to create events
     var $addNewEventLink = $("a#addNewEventLink");
     $addNewEventLink.on("click", function () {
         eventsModel.addNewEvent();

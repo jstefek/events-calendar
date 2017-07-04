@@ -65,31 +65,32 @@
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports) {
-
-function PersistanceUsingLocalStorage() {}
-PersistanceUsingLocalStorage.prototype.load = function (key) {
-//    console.log('PersistanceUsingLocalStorage load', key);
-    return localStorage.getItem(key);
-};
-PersistanceUsingLocalStorage.prototype.save = function (key, value) {
-//    console.log('PersistanceUsingLocalStorage save', key, value);
-    localStorage.setItem(key, JSON.stringify(value));
-};
-
-var p = new PersistanceUsingLocalStorage();
-module.exports = p;
-
-/***/ }),
-/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var CalendarEvent = __webpack_require__(2);
+var CalendarEvent = __webpack_require__(1);
+var persistanceUnit = __webpack_require__(2);
+
+function save(events) {
+    persistanceUnit.save('events', events);
+}
+
+function init(calendarEvents) {
+    var eventsAsJSON = persistanceUnit.load('events');
+    if (!!eventsAsJSON) {
+        var eventsO = JSON.parse(eventsAsJSON);
+        for (var e in eventsO) {
+            if (eventsO.hasOwnProperty(e)) {
+                var event = eventsO[e];
+                calendarEvents.addEvent(new CalendarEvent(event.id, event.name, event.color));
+            }
+        }
+    }
+}
 
 function CalendarEvents() {
     this.events = [];
-    this.persistanceUnit = __webpack_require__(0);
 }
+
 CalendarEvents.prototype.addEvent = function (e) {
     var id = e.getId();
     var numberOfEventsWithId = this.events.filter(function (val) {
@@ -101,7 +102,7 @@ CalendarEvents.prototype.addEvent = function (e) {
         wasAdded = true;
     }
     if (wasAdded) {
-        this.save();
+        save(this.events);
     }
     return wasAdded;
 };
@@ -115,7 +116,7 @@ CalendarEvents.prototype.updateEventWithId = function (id, newProps) {
         }
     });
     if (wasUpdated) {
-        this.save();
+        save(this.events);
     }
 };
 CalendarEvents.prototype.removeEvent = function (e) {
@@ -129,7 +130,7 @@ CalendarEvents.prototype.removeEvent = function (e) {
         return !found;
     });
     if (wasDeleted) {
-        this.save();
+        save(this.events);
     }
     return wasDeleted;
 };
@@ -146,29 +147,16 @@ CalendarEvents.prototype.getEventWithId = function (id) {
 CalendarEvents.prototype.getEvents = function () {
     return this.events.slice();// return duplicate
 };
-CalendarEvents.prototype.init = function () {
-    var eventsAsJSON = this.persistanceUnit.load('events');
-    if (!!eventsAsJSON) {
-        var eventsO = JSON.parse(eventsAsJSON);
-        for (var e in eventsO) {
-            if (eventsO.hasOwnProperty(e)) {
-                var event = eventsO[e];
-                this.addEvent(new CalendarEvent(event.id, event.name, event.color));
-            }
-        }
-    }
-};
-CalendarEvents.prototype.save = function () {
-    this.persistanceUnit.save('events', this.events);
-};
+
 var ce = new CalendarEvents();
-ce.init();
+init(ce);
+
 module.exports = ce;
 
 
 
 /***/ }),
-/* 2 */
+/* 1 */
 /***/ (function(module, exports) {
 
 function CalendarEvent(id, name, color) {
@@ -198,13 +186,29 @@ CalendarEvent.prototype.setId = function (i) {
 module.exports = CalendarEvent;
 
 /***/ }),
+/* 2 */
+/***/ (function(module, exports) {
+
+function PersistanceUsingLocalStorage() {}
+PersistanceUsingLocalStorage.prototype.load = function (key) {
+//    console.log('PersistanceUsingLocalStorage load', key);
+    return localStorage.getItem(key);
+};
+PersistanceUsingLocalStorage.prototype.save = function (key, value) {
+//    console.log('PersistanceUsingLocalStorage save', key, value);
+    localStorage.setItem(key, JSON.stringify(value));
+};
+
+var p = new PersistanceUsingLocalStorage();
+module.exports = p;
+
+/***/ }),
 /* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var DateEvent = __webpack_require__(4);
 
 function DatesModel() {
-    this.persistanceUnit = __webpack_require__(0);
     this.dateEvents = __webpack_require__(8);
     this.eventStorage = __webpack_require__(5);
 }
@@ -217,7 +221,7 @@ DatesModel.prototype.getEventIdForDate = function (date) {
 };
 DatesModel.prototype.addOrUpdateDate = function (date) {
     var id = this.eventStorage.getValue();
-    if (!!id) {
+    if (!!id) {// some event is selected
         this.dateEvents.addOrSwitchOrReplaceEvent(new DateEvent(id, date));
     }
 };
@@ -254,6 +258,7 @@ module.exports = DateEvent;
 /* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
+// global storage for actually selected event 
 var Storage = __webpack_require__(9);
 var s = new Storage();
 module.exports = s;
@@ -262,7 +267,7 @@ module.exports = s;
 /* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var calendarEvents = __webpack_require__(1);
+var calendarEvents = __webpack_require__(0);
 var eventsModel = __webpack_require__(7);
 var datesModel = __webpack_require__(3);
 
@@ -280,6 +285,7 @@ function getDate(d) {
 }
 
 $(function () {
+    // initialize date picker
     $("#datepicker").datepicker({
         inline: true,
         onSelect: function (date) {
@@ -287,14 +293,16 @@ $(function () {
         },
         beforeShowDay: function (date) {
             var eventId = datesModel.getEventIdForDate(getDate(date));
-            if (!!eventId) {
+            if (!!eventId) {// has the date some event on it?
+                // set an marker class on the date
                 return [true, "event-color-" + eventId, eventsModel.getName(eventId)];
             }
             return [true, "ui-state-default", ""];
         },
         afterShow: function () {
-            calendarEvents.getEvents().forEach(function (event) {
-                $('.event-color-' + event.id).each(function () {
+            calendarEvents.getEvents().forEach(function (event) {// for all events
+                $('.event-color-' + event.id).each(function () {// for all marked dates for this event
+                    // mark the date with the right event color
                     var t = $(this);
                     t.css('background', event.color);
                     t.find('> a').css('background', event.color);
@@ -304,6 +312,7 @@ $(function () {
         }
     });
 
+    // add ability to create events
     var $addNewEventLink = $("a#addNewEventLink");
     $addNewEventLink.on("click", function () {
         eventsModel.addNewEvent();
@@ -315,19 +324,30 @@ $(function () {
 /* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var CalendarEvent = __webpack_require__(2);
+var CalendarEvent = __webpack_require__(1);
 
 function removePreviouslySelected() {
     var els = document.getElementsByClassName('radioSelected');
-    for (var el in els) {
-        if (!!els[el] && !!els[el].classList) {
-            els[el].classList.remove('radioSelected');
+    for (var e in els) {
+        if (!!els[e] && !!els[e].classList) {
+            els[e].classList.remove('radioSelected');
         }
     }
 }
+
 function markSelected(el) {
     removePreviouslySelected();
-    el.setAttribute('class', 'radioSelected');
+    el.classList.add('radioSelected');
+}
+
+function init(eventsModel) {
+    $(function () {
+        var events = eventsModel.calendarEvents.getEvents();
+        for (var e in events) {
+            var event = events[e];
+            eventsModel.addEventEditElements(event.getId(), event.getName(), event.getColor());
+        }
+    })
 }
 
 function initColorOptions() {
@@ -345,84 +365,93 @@ function initColorOptions() {
     document.body.appendChild(dl);
 }
 
-function EventsModel() {
-    this.defaultColor = '#00f';
-    this.defaultName = '';
-    this.persistanceUnit = __webpack_require__(0);
-    this.datesModel = __webpack_require__(3);
-    this.calendarRefresher = __webpack_require__(10);
-    this.idGenerator = __webpack_require__(11);
-    this.eventStorage = __webpack_require__(5);
-    this.calendarEvents = __webpack_require__(1);
-}
-
-EventsModel.prototype.addEventEditElements = function (eventId, color, name) {
-    var ce = new CalendarEvent(eventId, name, color);
-    this.calendarEvents.addEvent(ce);
-
-    var newLi = document.createElement("li");
-    newLi.setAttribute('data-index', eventId);
-
-    if (!document.getElementById('colorsOptions')) {
-        initColorOptions();
-    }
-
-    var nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.placeholder = 'insert event name';
-    nameInput.value = name;
-
-    nameInput.onchange = function () {
-        ce.setName(nameInput.value);
-        this.calendarEvents.updateEventWithId(ce.id, ce);
-        this.calendarRefresher.refresh();
-    }.bind(this);
-
+function createColorInput(ce, eventsModel) {
     var colorInput = document.createElement('input');
     colorInput.type = 'color';
-    colorInput.value = color;
+    colorInput.value = ce.color;
     colorInput.setAttribute('list', 'colorsOptions');
     colorInput.setAttribute('tabindex', '-1');
     colorInput.addEventListener('input', function (event) {
         ce.setColor(event.target.value);
         this.calendarEvents.updateEventWithId(ce.id, ce);
         this.calendarRefresher.refresh();
-    }.bind(this));
+    }.bind(eventsModel));
+    return colorInput;
+}
 
+function createNameInput(ce, eventsModel) {
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = 'insert event name';
+    nameInput.value = ce.name;
+
+    nameInput.onchange = function () {
+        ce.setName(nameInput.value);
+        this.calendarEvents.updateEventWithId(ce.id, ce);
+        this.calendarRefresher.refresh();
+    }.bind(eventsModel);
+    return nameInput;
+}
+
+function createDeleteLink(ce, eventsModel) {
     var deleteLink = document.createElement("a");
     deleteLink.className = "ui-icon ui-icon-circle-minus";
     deleteLink.href = "#";
     deleteLink.addEventListener('click', function () {
         if (confirm("Opravdu chces odstranit tuto udalost?")) {
-            this.datesModel.removeAllDatesWithEventId(eventId);
-            this.removeEvent(eventId);
+            this.datesModel.removeAllDatesWithEventId(ce.id);
+            this.removeEvent(ce.id);
             this.calendarRefresher.refresh();
-        } else {
         }
-    }.bind(this));
+    }.bind(eventsModel));
+    return deleteLink;
+}
+
+function appendEventEditElements(ce, eventsModel) {
+    var nameInput = createNameInput(ce, eventsModel);
+    var colorInput = createColorInput(ce, eventsModel);
+    var deleteLink = createDeleteLink(ce, eventsModel);
 
     var div = document.createElement('div');
-
-    // select added div
-    markSelected(div);
-    this.eventStorage.setValue(eventId);
+    markSelected(div);// select added div
+    eventsModel.eventStorage.setValue(ce.id);
 
     div.appendChild(nameInput);
     div.appendChild(colorInput);
     div.appendChild(deleteLink);
 
-    newLi.appendChild(div);
-
-    newLi.addEventListener('click', function (event) {
+    var li = document.createElement("li");
+    li.setAttribute('data-index', ce.id);
+    li.appendChild(div);
+    li.addEventListener('click', function () {
         markSelected(div);
-        this.eventStorage.setValue(eventId);
-    }.bind(this));
+        this.eventStorage.setValue(ce.id);
+    }.bind(eventsModel));
 
-    document.querySelector("ul#eventsList").appendChild(newLi);
+    document.querySelector("ul#eventsList").appendChild(li);
+}
+
+function EventsModel() {
+    this.defaultColor = '#00f';
+    this.defaultName = '';
+    this.datesModel = __webpack_require__(3);
+    this.calendarRefresher = __webpack_require__(10);
+    this.idGenerator = __webpack_require__(11);
+    this.eventStorage = __webpack_require__(5);
+    this.calendarEvents = __webpack_require__(0);
+}
+
+EventsModel.prototype.addEventEditElements = function (eventId, name, color) {
+    var ce = new CalendarEvent(eventId, name, color);
+    this.calendarEvents.addEvent(ce);
+    if (!document.getElementById('colorsOptions')) {
+        initColorOptions();
+    }
+    appendEventEditElements(ce, this);
 };
 
 EventsModel.prototype.addNewEvent = function () {
-    this.addEventEditElements(this.idGenerator.generateID(), this.defaultColor, this.defaultName);
+    this.addEventEditElements(this.idGenerator.generateID(), this.defaultName, this.defaultColor);
 };
 
 EventsModel.prototype.removeEvent = function (id) {
@@ -432,7 +461,7 @@ EventsModel.prototype.removeEvent = function (id) {
         var element = document.querySelector("li[data-index='" + id + "']");
         var wasSelected = (element.children[0].getAttribute('class') || '').indexOf('radioSelected') !== -1;
         element.parentNode.removeChild(element);
-        if (wasSelected) {
+        if (wasSelected) {// if was selected, try to select first available event 
             selectFirstAvailableEventElement();
         }
     }
@@ -452,17 +481,10 @@ EventsModel.prototype.getName = function (id) {
     var event = this.calendarEvents.getEventWithId(id);
     return !!event && !!event.name ? event.name : this.defaultName;
 };
-EventsModel.prototype.init = function () {
-    $(function () {
-        var events = this.calendarEvents.getEvents();
-        for (var e in events) {
-            var event = events[e];
-            this.addEventEditElements(event.getId(), event.getColor(), event.getName());
-        }
-    }.bind(this));
-};
+
 var m = new EventsModel();
-m.init();
+init(m);
+
 module.exports = m;
 
 
@@ -473,10 +495,27 @@ module.exports = m;
 /***/ (function(module, exports, __webpack_require__) {
 
 var DateEvent = __webpack_require__(4);
+var persistanceUnit = __webpack_require__(2);
 
 function DateEvents() {
     this.events = [];
-    this.persistanceUnit = __webpack_require__(0);
+}
+
+function save(events) {
+    persistanceUnit.save('dates', events);
+}
+
+function init(dateEvents) {
+    var eventsAsJSON = persistanceUnit.load('dates');
+    if (!!eventsAsJSON) {
+        var eventsO = JSON.parse(eventsAsJSON);
+        for (var e in eventsO) {
+            if (eventsO.hasOwnProperty(e)) {
+                var event = eventsO[e];
+                dateEvents.addOrSwitchOrReplaceEvent(new DateEvent(event.id, event.date), true);
+            }
+        }
+    }
 }
 
 DateEvents.prototype.addOrSwitchOrReplaceEvent = function (e, omitSave) {
@@ -498,7 +537,7 @@ DateEvents.prototype.addOrSwitchOrReplaceEvent = function (e, omitSave) {
         this.events.push(e);
     }
     if (!omitSave) {
-        this.save();
+        save(this.events);
     }
 };
 DateEvents.prototype.removeEventsWithId = function (id) {
@@ -511,7 +550,7 @@ DateEvents.prototype.removeEventsWithId = function (id) {
         return !found;
     });
     if (wasDeleted) {
-        this.save();
+        save(this.events);
     }
     return wasDeleted;
 };
@@ -520,23 +559,10 @@ DateEvents.prototype.getEventWithDate = function (date) {
         return val.date === date;
     })[0];
 };
-DateEvents.prototype.init = function () {
-    var eventsAsJSON = this.persistanceUnit.load('dates');
-    if (!!eventsAsJSON) {
-        var eventsO = JSON.parse(eventsAsJSON);
-        for (var e in eventsO) {
-            if (eventsO.hasOwnProperty(e)) {
-                var event = eventsO[e];
-                this.addOrSwitchOrReplaceEvent(new DateEvent(event.id, event.date), true);
-            }
-        }
-    }
-};
-DateEvents.prototype.save = function () {
-    this.persistanceUnit.save('dates', this.events);
-};
+
 var de = new DateEvents();
-de.init();
+init(de);
+
 module.exports = de;
 
 
@@ -562,10 +588,13 @@ module.exports = Storage;
 /* 10 */
 /***/ (function(module, exports) {
 
-function CalendarRefresher() {}
+function CalendarRefresher(locator, methodName) {
+    this.locator = locator || '#datepicker';
+    this.methodName = methodName || 'refresh';
+}
 
 CalendarRefresher.prototype.refresh = function () {
-    $("#datepicker").datepicker("refresh");
+    $(this.locator).datepicker(this.methodName);
 };
 
 var cr = new CalendarRefresher();
@@ -578,10 +607,11 @@ module.exports = cr;
 /***/ (function(module, exports) {
 
 function IDGenerator() {}
-;
+
 IDGenerator.prototype.generateID = function () {
     return new Date().getTime();
 };
+
 var g = new IDGenerator();
 module.exports = g;
 

@@ -1,7 +1,7 @@
 function CalendarEvent(id, name, color) {
     this.id = id;
-    this.color = color || '';
     this.name = name || '';
+    this.color = color || '';
 }
 CalendarEvent.prototype.getColor = function () {
     return this.color;

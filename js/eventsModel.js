@@ -2,15 +2,26 @@ var CalendarEvent = require('./calendarEvent');
 
 function removePreviouslySelected() {
     var els = document.getElementsByClassName('radioSelected');
-    for (var el in els) {
-        if (!!els[el] && !!els[el].classList) {
-            els[el].classList.remove('radioSelected');
+    for (var e in els) {
+        if (!!els[e] && !!els[e].classList) {
+            els[e].classList.remove('radioSelected');
         }
     }
 }
+
 function markSelected(el) {
     removePreviouslySelected();
-    el.setAttribute('class', 'radioSelected');
+    el.classList.add('radioSelected');
+}
+
+function init(eventsModel) {
+    $(function () {
+        var events = eventsModel.calendarEvents.getEvents();
+        for (var e in events) {
+            var event = events[e];
+            eventsModel.addEventEditElements(event.getId(), event.getName(), event.getColor());
+        }
+    })
 }
 
 function initColorOptions() {
@@ -28,10 +39,75 @@ function initColorOptions() {
     document.body.appendChild(dl);
 }
 
+function createColorInput(ce, eventsModel) {
+    var colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = ce.color;
+    colorInput.setAttribute('list', 'colorsOptions');
+    colorInput.setAttribute('tabindex', '-1');
+    colorInput.addEventListener('input', function (event) {
+        ce.setColor(event.target.value);
+        this.calendarEvents.updateEventWithId(ce.id, ce);
+        this.calendarRefresher.refresh();
+    }.bind(eventsModel));
+    return colorInput;
+}
+
+function createNameInput(ce, eventsModel) {
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = 'insert event name';
+    nameInput.value = ce.name;
+
+    nameInput.onchange = function () {
+        ce.setName(nameInput.value);
+        this.calendarEvents.updateEventWithId(ce.id, ce);
+        this.calendarRefresher.refresh();
+    }.bind(eventsModel);
+    return nameInput;
+}
+
+function createDeleteLink(ce, eventsModel) {
+    var deleteLink = document.createElement("a");
+    deleteLink.className = "ui-icon ui-icon-circle-minus";
+    deleteLink.href = "#";
+    deleteLink.addEventListener('click', function () {
+        if (confirm("Opravdu chces odstranit tuto udalost?")) {
+            this.datesModel.removeAllDatesWithEventId(ce.id);
+            this.removeEvent(ce.id);
+            this.calendarRefresher.refresh();
+        }
+    }.bind(eventsModel));
+    return deleteLink;
+}
+
+function appendEventEditElements(ce, eventsModel) {
+    var nameInput = createNameInput(ce, eventsModel);
+    var colorInput = createColorInput(ce, eventsModel);
+    var deleteLink = createDeleteLink(ce, eventsModel);
+
+    var div = document.createElement('div');
+    markSelected(div);// select added div
+    eventsModel.eventStorage.setValue(ce.id);
+
+    div.appendChild(nameInput);
+    div.appendChild(colorInput);
+    div.appendChild(deleteLink);
+
+    var li = document.createElement("li");
+    li.setAttribute('data-index', ce.id);
+    li.appendChild(div);
+    li.addEventListener('click', function () {
+        markSelected(div);
+        this.eventStorage.setValue(ce.id);
+    }.bind(eventsModel));
+
+    document.querySelector("ul#eventsList").appendChild(li);
+}
+
 function EventsModel() {
     this.defaultColor = '#00f';
     this.defaultName = '';
-    this.persistanceUnit = require('./persistence');
     this.datesModel = require('./datesModel');
     this.calendarRefresher = require('./calendarRefresher');
     this.idGenerator = require('./idGenerator');
@@ -39,73 +115,17 @@ function EventsModel() {
     this.calendarEvents = require('./calendarEvents');
 }
 
-EventsModel.prototype.addEventEditElements = function (eventId, color, name) {
+EventsModel.prototype.addEventEditElements = function (eventId, name, color) {
     var ce = new CalendarEvent(eventId, name, color);
     this.calendarEvents.addEvent(ce);
-
-    var newLi = document.createElement("li");
-    newLi.setAttribute('data-index', eventId);
-
     if (!document.getElementById('colorsOptions')) {
         initColorOptions();
     }
-
-    var nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.placeholder = 'insert event name';
-    nameInput.value = name;
-
-    nameInput.onchange = function () {
-        ce.setName(nameInput.value);
-        this.calendarEvents.updateEventWithId(ce.id, ce);
-        this.calendarRefresher.refresh();
-    }.bind(this);
-
-    var colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.value = color;
-    colorInput.setAttribute('list', 'colorsOptions');
-    colorInput.setAttribute('tabindex', '-1');
-    colorInput.addEventListener('input', function (event) {
-        ce.setColor(event.target.value);
-        this.calendarEvents.updateEventWithId(ce.id, ce);
-        this.calendarRefresher.refresh();
-    }.bind(this));
-
-    var deleteLink = document.createElement("a");
-    deleteLink.className = "ui-icon ui-icon-circle-minus";
-    deleteLink.href = "#";
-    deleteLink.addEventListener('click', function () {
-        if (confirm("Opravdu chces odstranit tuto udalost?")) {
-            this.datesModel.removeAllDatesWithEventId(eventId);
-            this.removeEvent(eventId);
-            this.calendarRefresher.refresh();
-        } else {
-        }
-    }.bind(this));
-
-    var div = document.createElement('div');
-
-    // select added div
-    markSelected(div);
-    this.eventStorage.setValue(eventId);
-
-    div.appendChild(nameInput);
-    div.appendChild(colorInput);
-    div.appendChild(deleteLink);
-
-    newLi.appendChild(div);
-
-    newLi.addEventListener('click', function (event) {
-        markSelected(div);
-        this.eventStorage.setValue(eventId);
-    }.bind(this));
-
-    document.querySelector("ul#eventsList").appendChild(newLi);
+    appendEventEditElements(ce, this);
 };
 
 EventsModel.prototype.addNewEvent = function () {
-    this.addEventEditElements(this.idGenerator.generateID(), this.defaultColor, this.defaultName);
+    this.addEventEditElements(this.idGenerator.generateID(), this.defaultName, this.defaultColor);
 };
 
 EventsModel.prototype.removeEvent = function (id) {
@@ -115,7 +135,7 @@ EventsModel.prototype.removeEvent = function (id) {
         var element = document.querySelector("li[data-index='" + id + "']");
         var wasSelected = (element.children[0].getAttribute('class') || '').indexOf('radioSelected') !== -1;
         element.parentNode.removeChild(element);
-        if (wasSelected) {
+        if (wasSelected) {// if was selected, try to select first available event 
             selectFirstAvailableEventElement();
         }
     }
@@ -135,17 +155,10 @@ EventsModel.prototype.getName = function (id) {
     var event = this.calendarEvents.getEventWithId(id);
     return !!event && !!event.name ? event.name : this.defaultName;
 };
-EventsModel.prototype.init = function () {
-    $(function () {
-        var events = this.calendarEvents.getEvents();
-        for (var e in events) {
-            var event = events[e];
-            this.addEventEditElements(event.getId(), event.getColor(), event.getName());
-        }
-    }.bind(this));
-};
+
 var m = new EventsModel();
-m.init();
+init(m);
+
 module.exports = m;
 
 

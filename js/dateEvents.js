@@ -1,8 +1,25 @@
 var DateEvent = require('./dateEvent');
+var persistanceUnit = require('./persistence');
 
 function DateEvents() {
     this.events = [];
-    this.persistanceUnit = require('./persistence');
+}
+
+function save(events) {
+    persistanceUnit.save('dates', events);
+}
+
+function init(dateEvents) {
+    var eventsAsJSON = persistanceUnit.load('dates');
+    if (!!eventsAsJSON) {
+        var eventsO = JSON.parse(eventsAsJSON);
+        for (var e in eventsO) {
+            if (eventsO.hasOwnProperty(e)) {
+                var event = eventsO[e];
+                dateEvents.addOrSwitchOrReplaceEvent(new DateEvent(event.id, event.date), true);
+            }
+        }
+    }
 }
 
 DateEvents.prototype.addOrSwitchOrReplaceEvent = function (e, omitSave) {
@@ -24,7 +41,7 @@ DateEvents.prototype.addOrSwitchOrReplaceEvent = function (e, omitSave) {
         this.events.push(e);
     }
     if (!omitSave) {
-        this.save();
+        save(this.events);
     }
 };
 DateEvents.prototype.removeEventsWithId = function (id) {
@@ -37,7 +54,7 @@ DateEvents.prototype.removeEventsWithId = function (id) {
         return !found;
     });
     if (wasDeleted) {
-        this.save();
+        save(this.events);
     }
     return wasDeleted;
 };
@@ -46,22 +63,9 @@ DateEvents.prototype.getEventWithDate = function (date) {
         return val.date === date;
     })[0];
 };
-DateEvents.prototype.init = function () {
-    var eventsAsJSON = this.persistanceUnit.load('dates');
-    if (!!eventsAsJSON) {
-        var eventsO = JSON.parse(eventsAsJSON);
-        for (var e in eventsO) {
-            if (eventsO.hasOwnProperty(e)) {
-                var event = eventsO[e];
-                this.addOrSwitchOrReplaceEvent(new DateEvent(event.id, event.date), true);
-            }
-        }
-    }
-};
-DateEvents.prototype.save = function () {
-    this.persistanceUnit.save('dates', this.events);
-};
+
 var de = new DateEvents();
-de.init();
+init(de);
+
 module.exports = de;
 

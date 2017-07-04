@@ -1,9 +1,27 @@
 var CalendarEvent = require('./calendarEvent');
+var persistanceUnit = require('./persistence');
+
+function save(events) {
+    persistanceUnit.save('events', events);
+}
+
+function init(calendarEvents) {
+    var eventsAsJSON = persistanceUnit.load('events');
+    if (!!eventsAsJSON) {
+        var eventsO = JSON.parse(eventsAsJSON);
+        for (var e in eventsO) {
+            if (eventsO.hasOwnProperty(e)) {
+                var event = eventsO[e];
+                calendarEvents.addEvent(new CalendarEvent(event.id, event.name, event.color));
+            }
+        }
+    }
+}
 
 function CalendarEvents() {
     this.events = [];
-    this.persistanceUnit = require('./persistence');
 }
+
 CalendarEvents.prototype.addEvent = function (e) {
     var id = e.getId();
     var numberOfEventsWithId = this.events.filter(function (val) {
@@ -15,7 +33,7 @@ CalendarEvents.prototype.addEvent = function (e) {
         wasAdded = true;
     }
     if (wasAdded) {
-        this.save();
+        save(this.events);
     }
     return wasAdded;
 };
@@ -29,7 +47,7 @@ CalendarEvents.prototype.updateEventWithId = function (id, newProps) {
         }
     });
     if (wasUpdated) {
-        this.save();
+        save(this.events);
     }
 };
 CalendarEvents.prototype.removeEvent = function (e) {
@@ -43,7 +61,7 @@ CalendarEvents.prototype.removeEvent = function (e) {
         return !found;
     });
     if (wasDeleted) {
-        this.save();
+        save(this.events);
     }
     return wasDeleted;
 };
@@ -60,22 +78,9 @@ CalendarEvents.prototype.getEventWithId = function (id) {
 CalendarEvents.prototype.getEvents = function () {
     return this.events.slice();// return duplicate
 };
-CalendarEvents.prototype.init = function () {
-    var eventsAsJSON = this.persistanceUnit.load('events');
-    if (!!eventsAsJSON) {
-        var eventsO = JSON.parse(eventsAsJSON);
-        for (var e in eventsO) {
-            if (eventsO.hasOwnProperty(e)) {
-                var event = eventsO[e];
-                this.addEvent(new CalendarEvent(event.id, event.name, event.color));
-            }
-        }
-    }
-};
-CalendarEvents.prototype.save = function () {
-    this.persistanceUnit.save('events', this.events);
-};
+
 var ce = new CalendarEvents();
-ce.init();
+init(ce);
+
 module.exports = ce;
 

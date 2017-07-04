@@ -1,7 +1,6 @@
 var DateEvent = require('./dateEvent');
 
 function DatesModel() {
-    this.persistanceUnit = require('./persistence');
     this.dateEvents = require('./dateEvents');
     this.eventStorage = require('./eventStorage');
 }
@@ -14,7 +13,7 @@ DatesModel.prototype.getEventIdForDate = function (date) {
 };
 DatesModel.prototype.addOrUpdateDate = function (date) {
     var id = this.eventStorage.getValue();
-    if (!!id) {
+    if (!!id) {// some event is selected
         this.dateEvents.addOrSwitchOrReplaceEvent(new DateEvent(id, date));
     }
 };
