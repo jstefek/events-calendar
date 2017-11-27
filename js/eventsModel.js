@@ -21,7 +21,7 @@ function init(eventsModel) {
             var event = events[e];
             eventsModel.addEventEditElements(event.getId(), event.getName(), event.getColor());
         }
-    })
+    });
 }
 
 function initColorOptions() {
@@ -106,7 +106,7 @@ function appendEventEditElements(ce, eventsModel) {
 }
 
 function EventsModel() {
-    this.defaultColor = '#00f';
+    this.defaultColor = '#7777ff';
     this.defaultName = '';
     this.datesModel = require('./datesModel');
     this.calendarRefresher = require('./calendarRefresher');

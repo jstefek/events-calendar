@@ -161,8 +161,8 @@ module.exports = ce;
 
 function CalendarEvent(id, name, color) {
     this.id = id;
-    this.color = color || '';
     this.name = name || '';
+    this.color = color || '';
 }
 CalendarEvent.prototype.getColor = function () {
     return this.color;
@@ -347,7 +347,7 @@ function init(eventsModel) {
             var event = events[e];
             eventsModel.addEventEditElements(event.getId(), event.getName(), event.getColor());
         }
-    })
+    });
 }
 
 function initColorOptions() {
@@ -432,7 +432,7 @@ function appendEventEditElements(ce, eventsModel) {
 }
 
 function EventsModel() {
-    this.defaultColor = '#00f';
+    this.defaultColor = '#7777ff';
     this.defaultName = '';
     this.datesModel = __webpack_require__(3);
     this.calendarRefresher = __webpack_require__(10);

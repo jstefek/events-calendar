@@ -29,3 +29,17 @@ li[data-index] a{
     margin-top: 5px;
     padding:0;
 }
+
+/* mark today with black border */
+.ui-datepicker-today{
+    border: solid 5px black !important;
+}
+/* do not highlight today on hover */
+.ui-datepicker-today .ui-state-hover{
+    border: none !important;
+}
+/* disable default today highlighting */
+.ui-datepicker-today .ui-state-highlight{
+    border: none !important;
+    background: inherit !important;
+}
